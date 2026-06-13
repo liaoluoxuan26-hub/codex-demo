@@ -21,6 +21,15 @@ const stopWords = [
   "我们", "你们", "他们", "这个", "那个", "一个", "就是", "然后", "所以", "因为", "如果", "但是", "其实", "什么", "怎么", "可以", "进行", "通过", "不要", "不是", "没有", "自己", "很多", "今天", "视频", "课程", "内容", "文案"
 ];
 
+const noisePatterns = [
+  /token[:：=]?[a-z0-9_\-]{6,}/i,
+  /access[_-]?token/i,
+  /session[_-]?id/i,
+  /[a-f0-9]{24,}/i,
+  /[a-z0-9+/=]{28,}/i,
+  /第?\d+\s*页|加载中|点击展开|复制链接|扫码|关注账号/
+];
+
 const exampleText = "很多人做知识类短视频，最大的问题不是不会讲，而是开头太慢。首先，你要在前三秒说出用户的痛点，比如学员想做课程却不知道怎么写文案。第二，把一个大主题拆成三个小观点：问题是什么、为什么会这样、马上能做什么。第三，用一个真实案例增强信任，例如有位学员把一节30分钟课程拆成5条短视频，完播率明显提升。记住，好的课程文案不是把内容讲完，而是让用户愿意继续听。最后，给用户一个简单行动：今天先把你的课程标题改成一个具体问题。";
 
 let latestResultText = "";
@@ -59,7 +68,7 @@ analyzeBtn.addEventListener("click", function () {
   latestResult = buildResult(sentences);
   latestResultText = formatResultText(latestResult);
   renderResult(latestResult);
-  message.textContent = "已自动过滤乱码和重复内容，生成更干净的拆解结果。";
+  message.textContent = "已自动过滤乱码、重复内容和 token 等无意义内容，生成更干净的拆解结果。";
 });
 
 exampleBtn.addEventListener("click", function () {
@@ -106,6 +115,8 @@ function splitText(text) {
 function cleanSentence(sentence) {
   return sentence
     .replace(/https?:\/\/\S+/g, "")
+    .replace(/\b[a-z0-9_\-]*token[a-z0-9_\-]*\b/ig, "")
+    .replace(/[a-z0-9+/=]{28,}/ig, "")
     .replace(/[▶◆●■★☆#@￥$%^&*_+=<>|~`\\/]{2,}/g, "")
     .replace(/\s+/g, " ")
     .replace(/^[,，.。:：;；!！?？\-—\s]+|[,，:：;；\-—\s]+$/g, "")
@@ -138,11 +149,15 @@ function isUsefulSentence(sentence) {
   const chineseChars = sentence.match(/[\u4e00-\u9fa5]/g) || [];
   const chineseRatio = chineseChars.length / Math.max(sentence.length, 1);
   const repeatedChars = /(.)\1{5,}/.test(sentence);
+  const repeatedWords = /(.{2,6})\1{3,}/.test(sentence);
   const tooShort = chineseChars.length < 8;
   const tooLong = sentence.length > 120;
   const mostlySymbols = chineseRatio < 0.45;
+  const hasNoiseToken = noisePatterns.some(function (pattern) {
+    return pattern.test(sentence);
+  });
 
-  return !tooShort && !tooLong && !mostlySymbols && !repeatedChars;
+  return !tooShort && !tooLong && !mostlySymbols && !repeatedChars && !repeatedWords && !hasNoiseToken;
 }
 
 function makeFingerprint(sentence) {
