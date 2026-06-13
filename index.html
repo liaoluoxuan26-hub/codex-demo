@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>短视频课程文案拆解器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">手机端网页工具</p>
+      <h1>短视频课程文案拆解器</h1>
+      <p class="intro">粘贴视频链接和已提取的课程文字，一键整理成标题、主题、观点、案例、金句和短视频文案。</p>
+    </section>
+
+    <section class="card input-card" aria-labelledby="inputTitle">
+      <h2 id="inputTitle">输入内容</h2>
+
+      <label for="videoLink">视频链接</label>
+      <input id="videoLink" type="url" placeholder="例如：https://www.douyin.com/video/...">
+
+      <label for="videoText">已提取的视频文字</label>
+      <textarea id="videoText" rows="10" placeholder="请粘贴课程口播稿、字幕或转写文字。第一版暂不支持自动解析链接。"></textarea>
+
+      <div class="button-group">
+        <button id="analyzeBtn" class="primary-button" type="button">开始拆解</button>
+        <button id="exampleBtn" class="secondary-button" type="button">示例文案</button>
+        <button id="clearBtn" class="ghost-button" type="button">清空内容</button>
+      </div>
+      <p id="message" class="message" role="alert"></p>
+    </section>
+
+    <section class="card result-card" aria-labelledby="resultTitle">
+      <div class="result-header">
+        <h2 id="resultTitle">拆解结果</h2>
+        <button id="copyBtn" class="copy-button" type="button">一键复制全部结果</button>
+      </div>
+      <div id="resultList" class="result-list">
+        <p class="empty">结果会显示在这里。</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
