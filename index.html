@@ -9,36 +9,64 @@
 <body>
   <main class="app">
     <section class="hero">
-      <p class="eyebrow">手机端网页工具</p>
+      <p class="eyebrow">文本清洗 · 基础拆解 · 提示词生成</p>
       <h1>短视频课程文案拆解器</h1>
-      <p class="intro">粘贴视频链接和已提取的课程文字，一键整理成标题、主题、观点、案例、金句和短视频文案。</p>
+      <p class="intro">第一版不直接解析抖音、快手、B站链接，需要先用飞鸟、斑马等工具转成文字后再粘贴。</p>
+    </section>
+
+    <section class="notice-card" aria-label="工具定位说明">
+      <strong>工具定位说明：</strong>本工具第一版是前端规则拆解器，不是真正的大模型。适合做初步清洗、结构拆分和生成 ChatGPT 深度拆解提示词。如果要高质量理解长课程，请复制深度拆解提示词到 ChatGPT 中继续处理。
     </section>
 
     <section class="card input-card" aria-labelledby="inputTitle">
       <h2 id="inputTitle">输入内容</h2>
 
       <label for="videoLink">视频链接</label>
-      <input id="videoLink" type="url" placeholder="例如：https://www.douyin.com/video/...">
+      <input id="videoLink" type="url" placeholder="例如：https://www.douyin.com/video/...（仅用于记录来源）">
 
-      <label for="videoText">已提取的视频文字</label>
-      <textarea id="videoText" rows="10" placeholder="请粘贴课程口播稿、字幕或转写文字。第一版暂不支持自动解析链接。"></textarea>
+      <label for="videoText">已提取视频文字</label>
+      <textarea id="videoText" rows="12" placeholder="请粘贴通过飞鸟、斑马等工具提取的课程口播稿、字幕或转写文字。"></textarea>
 
-      <div class="button-group">
-        <button id="analyzeBtn" class="primary-button" type="button">开始拆解</button>
+      <div class="button-group" aria-label="操作按钮区">
         <button id="exampleBtn" class="secondary-button" type="button">示例文案</button>
+        <button id="analyzeBtn" class="primary-button" type="button">开始拆解</button>
+        <button id="cleanBtn" class="secondary-button" type="button">清洗文本</button>
         <button id="clearBtn" class="ghost-button" type="button">清空内容</button>
+        <button id="copyBtn" class="dark-button" type="button">一键复制全部结果</button>
+        <button id="promptBtn" class="primary-soft-button" type="button">生成 ChatGPT 深度拆解提示词</button>
+        <button id="copyPromptBtn" class="dark-button" type="button">复制 ChatGPT 深度拆解提示词</button>
       </div>
       <p id="message" class="message" role="alert"></p>
     </section>
 
+    <section class="card clean-card" aria-labelledby="cleanTitle">
+      <div class="result-header">
+        <h2 id="cleanTitle">清洗后的文本</h2>
+        <button id="copyCleanBtn" class="module-copy-button" type="button">复制清洗文本</button>
+      </div>
+      <pre id="cleanedText" class="text-output">清洗后的文本会显示在这里。</pre>
+    </section>
+
     <section class="card result-card" aria-labelledby="resultTitle">
       <div class="result-header">
-        <h2 id="resultTitle">拆解结果</h2>
-        <button id="copyBtn" class="copy-button" type="button">一键复制全部结果</button>
+        <h2 id="resultTitle">拆解结果区域</h2>
       </div>
       <div id="resultList" class="result-list">
         <p class="empty">结果会显示在这里。</p>
       </div>
+    </section>
+
+    <section class="card prompt-card" aria-labelledby="promptTitle">
+      <div class="result-header">
+        <h2 id="promptTitle">ChatGPT 深度拆解提示词区域</h2>
+      </div>
+      <article class="result-item">
+        <div class="result-item-header">
+          <h3>【复制给 ChatGPT 的深度拆解提示词】</h3>
+          <button id="copyPromptInlineBtn" class="module-copy-button" type="button">复制</button>
+        </div>
+        <pre id="promptOutput" class="text-output">提示词会显示在这里。</pre>
+      </article>
     </section>
   </main>
 
