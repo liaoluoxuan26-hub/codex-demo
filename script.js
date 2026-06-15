@@ -2,403 +2,205 @@ const videoLinkInput = document.querySelector("#videoLink");
 const videoTextInput = document.querySelector("#videoText");
 const analyzeBtn = document.querySelector("#analyzeBtn");
 const exampleBtn = document.querySelector("#exampleBtn");
+const cleanBtn = document.querySelector("#cleanBtn");
 const clearBtn = document.querySelector("#clearBtn");
 const copyBtn = document.querySelector("#copyBtn");
+const promptBtn = document.querySelector("#promptBtn");
+const copyPromptBtn = document.querySelector("#copyPromptBtn");
+const copyPromptInlineBtn = document.querySelector("#copyPromptInlineBtn");
+const copyCleanBtn = document.querySelector("#copyCleanBtn");
 const message = document.querySelector("#message");
 const resultList = document.querySelector("#resultList");
+const cleanedTextOutput = document.querySelector("#cleanedText");
+const promptOutput = document.querySelector("#promptOutput");
 
-const moduleTitles = [
-  "课程标题",
-  "核心主题",
-  "主要观点",
-  "关键案例",
-  "金句摘录",
-  "可执行步骤",
-  "适合发短视频的文案版本"
-];
+const moduleTitles = ["课程标题", "核心主题", "主要观点", "关键案例", "金句摘录", "可执行步骤", "适合发短视频的文案版本"];
+const actionVerbs = ["选择", "复制", "粘贴", "整理", "提炼", "测试", "记录", "复盘", "优化", "发布", "保存", "验证"];
+const fallbackTitles = ["普通人如何把工具变成生产流程", "如何把碎片信息转化成行动能力", "会用工具的人为什么更容易拉开差距"];
+const stopWords = new Set(["今天", "我们", "一个", "这个", "那个", "很多", "问题", "原因", "不是", "而是", "所以", "比如", "例如", "真正", "关键", "内容", "课程", "文案", "短视频", "工具", "普通人", "可以", "没有", "自己", "最后", "开始", "形成", "进行"]);
+const exampleText = `今天我们聊一个普通人非常容易忽略的问题：为什么很多人学了很多东西，最后还是没有改变？
 
-const stopWords = new Set([
-  "一个", "这个", "那个", "我们", "你们", "他们", "很多", "就是", "因为", "所以", "如果", "但是", "然后", "其实", "可以", "不是", "没有", "不要", "需要", "通过", "进行", "以及", "或者", "可能", "时候", "内容", "视频", "课程", "文案", "短视频", "token", "undefined", "null", "nan", "字幕", "识别", "提取"
-]);
+原因不是他不努力，而是他只是在收集碎片信息，没有形成系统。比如你刷短视频，今天看到一个人讲认知，明天看到一个人讲赚钱，后天又看到一个人讲AI工具。你觉得自己学了很多，但这些东西没有被整理成方法，也没有真正用到生活里。
 
-const noisyPatterns = [
-  /https?:\/\/\S+/gi,
-  /www\.\S+/gi,
-  /[a-z0-9_+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,
-  /\b(token|timestamp|undefined|null|nan|error|debug|json|api|id|uuid)\b/gi,
-  /[a-f0-9]{16,}/gi,
-  /\[[^\]\u4e00-\u9fa5]{1,30}\]/g,
-  /\{[^{}]{0,80}\}/g,
-  /<[^>]+>/g
-];
+真正有用的学习，不是看了多少内容，而是你能不能把内容变成自己的操作流程。比如你今天学了一个AI工具，不要只听博主说它多厉害，你要亲自注册、亲自创建仓库、亲自让它生成代码、亲自发布网页、亲自测试效果。你只要完整跑一遍，理解就会明显加深。
 
-const exampleText = "很多人做知识类短视频，最大的问题不是不会讲，而是开头太慢。首先，你要在前三秒说出用户的痛点，比如学员想做课程却不知道怎么写文案。第二，把一个大主题拆成三个小观点：问题是什么、为什么会这样、马上能做什么。第三，用一个真实案例增强信任，例如有位学员把一节30分钟课程拆成5条短视频，完播率明显提升。记住，好的课程文案不是把内容讲完，而是让用户愿意继续听。最后，给用户一个简单行动：今天先把你的课程标题改成一个具体问题。";
+这里有一个关键点：普通人和会使用工具的人之间，差距不是智商，而是是否愿意动手。很多人遇到VPN、谷歌账号、GitHub、虚拟卡、订阅、部署这些步骤，马上就放弃了。他们觉得太麻烦，于是只能花钱找代充、买镜像、听别人讲概念。
 
+但真正的电子杠杆，不是你知道一个工具名字，而是你能把它用起来。比如AI可以帮你写代码，GitHub可以帮你管理项目，Pages可以帮你发布网页，转文字工具可以帮你提取课程内容。你把这些工具串起来，就形成了一套自己的生产流程。
+
+所以今天最重要的结论是：不要沉迷于听概念，要把工具跑通。先从一个小项目开始，哪怕只是做一个简单网页，只要你亲自经历了创建、修改、提交、合并、发布、测试这几个步骤，你就已经比只刷短视频的人强很多。
+
+普通人缺的不是信息，而是把信息转化成行动的能力。谁能把知识变成流程，谁就能真正获得杠杆。`;
 let latestResultText = "";
+let latestPromptText = "";
+let latestCleanText = "";
 
-analyzeBtn.addEventListener("click", function () {
-  const videoLink = videoLinkInput.value.trim();
-  const videoText = videoTextInput.value.trim();
+exampleBtn.addEventListener("click", () => { videoLinkInput.value = "https://example.com/course-source"; videoTextInput.value = exampleText; message.textContent = "已填入内置测试样本文案。"; });
+cleanBtn.addEventListener("click", () => cleanAndShow(true));
+analyzeBtn.addEventListener("click", analyzeText);
+promptBtn.addEventListener("click", () => generatePrompt(true));
+copyBtn.addEventListener("click", () => latestResultText ? copyText(latestResultText, "全部拆解结果已复制。") : showMessage("还没有可复制的拆解结果，请先点击“开始拆解”。"));
+copyPromptBtn.addEventListener("click", copyPrompt);
+copyPromptInlineBtn.addEventListener("click", copyPrompt);
+copyCleanBtn.addEventListener("click", () => latestCleanText ? copyText(latestCleanText, "清洗后的文本已复制。") : showMessage("请先点击“清洗文本”。"));
+clearBtn.addEventListener("click", () => { videoLinkInput.value = ""; videoTextInput.value = ""; latestResultText = ""; latestPromptText = ""; latestCleanText = ""; cleanedTextOutput.textContent = "清洗后的文本会显示在这里。"; promptOutput.textContent = "提示词会显示在这里。"; showEmptyResult(); showMessage("内容已清空。"); });
 
-  message.textContent = "";
-
-  if (videoLink && !videoText) {
-    latestResultText = "";
-    showEmptyResult();
-    message.textContent = "第一版暂不支持自动解析链接，请先粘贴文案内容。";
-    return;
-  }
-
-  if (!videoText) {
-    latestResultText = "";
-    showEmptyResult();
-    message.textContent = "请先粘贴需要拆解的视频文字。";
-    return;
-  }
-
-  const cleanText = cleanInputText(videoText);
+function analyzeText() {
+  const cleanText = cleanAndShow(false);
+  if (!cleanText) return;
   const sentences = splitText(cleanText);
-
-  if (!sentences.length) {
-    latestResultText = "";
-    showEmptyResult();
-    message.textContent = "没有识别到有效中文内容，请删掉乱码或补充完整文案。";
-    return;
-  }
-
+  if (!sentences.length) { showEmptyResult(); latestResultText = ""; showMessage("没有识别到有效中文内容，请删掉乱码或补充完整文案。"); return; }
   const result = buildResult(cleanText, sentences);
   latestResultText = formatResultText(result);
   renderResult(result);
-  message.textContent = "拆解完成，可复制全部结果或单独复制某个模块。";
-});
+  generatePrompt(false);
+  showMessage("拆解完成，可复制全部结果、单独模块或 ChatGPT 深度拆解提示词。");
+}
 
-exampleBtn.addEventListener("click", function () {
-  videoLinkInput.value = "https://example.com/demo-video";
-  videoTextInput.value = exampleText;
-  message.textContent = "已填入示例文案，可以点击“开始拆解”查看效果。";
-  videoTextInput.focus();
-});
-
-clearBtn.addEventListener("click", function () {
-  videoLinkInput.value = "";
-  videoTextInput.value = "";
-  latestResultText = "";
-  message.textContent = "内容已清空。";
-  showEmptyResult();
-  videoLinkInput.focus();
-});
-
-copyBtn.addEventListener("click", function () {
-  if (!latestResultText) {
-    message.textContent = "还没有可复制的拆解结果，请先点击“开始拆解”。";
-    return;
-  }
-
-  copyText(latestResultText, "全部拆解结果已复制。");
-});
+function cleanAndShow(writeBack) {
+  const raw = videoTextInput.value.trim();
+  if (videoLinkInput.value.trim() && !raw) showMessage("第一版暂不支持自动解析链接，请先粘贴文案内容。");
+  if (!raw) { latestCleanText = ""; cleanedTextOutput.textContent = "清洗后的文本会显示在这里。"; return ""; }
+  latestCleanText = cleanInputText(raw);
+  cleanedTextOutput.textContent = latestCleanText || "没有保留下有效中文内容。";
+  if (writeBack && latestCleanText) videoTextInput.value = latestCleanText;
+  if (writeBack) showMessage("文本已清洗，可继续点击“开始拆解”。");
+  return latestCleanText;
+}
 
 function cleanInputText(text) {
-  let cleaned = text.normalize("NFKC");
-
-  noisyPatterns.forEach(function (pattern) {
-    cleaned = cleaned.replace(pattern, " ");
-  });
-
-  return cleaned
-    .replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g, "$1$2")
+  let cleaned = text.normalize("NFKC")
+    .replace(/https?:\/\/\S+|www\.\S+/gi, " ")
+    .replace(/\b(?:king\s*)?tokens?\b/gi, " ")
+    .replace(/\b(?:undefined|null|nan|debug|error|timestamp|uuid|json)\b/gi, " ")
+    .replace(/[a-z]{8,}(?:\s+[a-z]{3,}){1,}/gi, " ")
+    .replace(/([。！？!?，,；;：:、])\1+/g, "$1")
     .replace(/[\t\r]+/g, " ")
-    .replace(/[|*_#~`^=<>]+/g, " ")
+    .replace(/[|*_#~`^={}<>\[\]\\]+/g, " ")
     .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g, "$1$2")
+    .replace(/\s+/g, " ");
+  return uniqueList(cleaned.split(/(?<=[。！？!?；;])|\n+/).map((item) => item.trim()).filter((item) => item && !isNoisySentence(item))).join("\n");
 }
 
 function splitText(text) {
-  const seen = new Set();
-
-  return text
-    .split(/[。！？!?；;\n]+|(?<=\D)[,.，、](?=\s*第[一二三四五六七八九十]|\s*(?:首先|其次|然后|最后))/)
-    .map(function (sentence) {
-      return sentence.trim().replace(/^[,，、：:；;\-\s]+|[,，、：:；;\-\s]+$/g, "");
-    })
-    .filter(function (sentence) {
-      if (!sentence || sentence.length < 6 || isNoisySentence(sentence)) {
-        return false;
-      }
-
-      const key = sentence.slice(0, 70);
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
+  return uniqueList(text.split(/[。！？!?；;\n]+/).map((s) => s.trim().replace(/^[,，、：:\-\s]+|[,，、：:\-\s]+$/g, "")).filter((s) => s.length >= 12 && !isNoisySentence(s)));
 }
 
 function isNoisySentence(sentence) {
-  const chineseChars = sentence.match(/[\u4e00-\u9fa5]/g) || [];
+  const chinese = sentence.match(/[\u4e00-\u9fa5]/g) || [];
   const letters = sentence.match(/[a-z]/gi) || [];
-  const symbols = sentence.match(/[^\w\u4e00-\u9fa5，。！？；：、,.!?;:\s]/g) || [];
-
-  return chineseChars.length < 4 || letters.length > chineseChars.length || symbols.length > sentence.length * 0.22;
+  return chinese.length < 6 || letters.length > chinese.length * 0.7 || /\b(?:king\s*)?tokens?\b/i.test(sentence) || /(.)\1{8,}/.test(sentence);
 }
 
 function buildResult(text, sentences) {
   const keywords = getTopKeywords(text);
-  const rankedSentences = rankSentences(sentences, keywords);
-  const coreSentences = rankedSentences.slice(0, 3);
-  const mainPoints = pickMainPoints(sentences, rankedSentences);
-  const cases = findByKeywords(sentences, ["比如", "例如", "案例", "故事", "客户", "学员", "用户", "真实", "曾经"]);
-  const quotes = findGoldenSentences(sentences, keywords);
-  const steps = findSteps(sentences, rankedSentences);
-  const title = makeTitle(keywords, coreSentences, sentences);
-
+  const ranked = rankSentences(sentences, keywords);
+  const points = makeMainPoints(sentences, ranked).slice(0, 5);
+  const steps = makeActionSteps(sentences);
   return {
-    "课程标题": title,
-    "核心主题": summarizeTheme(keywords, coreSentences, sentences),
-    "主要观点": mainPoints.length ? mainPoints : ["暂未识别到明确观点，可补充更完整的课程文字。"],
-    "关键案例": cases.length ? cases : ["暂未识别到案例，可从原文中补充“比如/例如/案例/学员”相关内容。"],
-    "金句摘录": quotes.length ? quotes : coreSentences.slice(0, 2),
-    "可执行步骤": steps.length ? steps : ["明确用户最关心的痛点。", "拆出3个可以马上理解的小观点。", "补充案例或对比，增强信任。", "用一句行动指令收尾。"],
-    "适合发短视频的文案版本": makeShortVideoCopy(title, mainPoints, steps)
+    "课程标题": makeTitle(keywords, ranked),
+    "核心主题": makeTheme(ranked, keywords),
+    "主要观点": points,
+    "关键案例": findCases(sentences),
+    "金句摘录": findQuotes(sentences, keywords),
+    "可执行步骤": steps,
+    "适合发短视频的文案版本": makeShortVideoCopy(points, steps)
   };
 }
 
 function getTopKeywords(text) {
-  const words = text.match(/[\u4e00-\u9fa5]{2,6}/g) || [];
-  const scores = {};
-
-  words.forEach(function (word) {
-    for (let size = Math.min(4, word.length); size >= 2; size -= 1) {
-      for (let index = 0; index <= word.length - size; index += 1) {
-        const part = word.slice(index, index + size);
-        if (!stopWords.has(part) && !/^第[一二三四五六七八九十]$/.test(part)) {
-          scores[part] = (scores[part] || 0) + size;
-        }
+  const counts = {};
+  (text.match(/[\u4e00-\u9fa5]{2,6}/g) || []).forEach((chunk) => {
+    for (let size = Math.min(4, chunk.length); size >= 2; size -= 1) {
+      for (let i = 0; i <= chunk.length - size; i += 1) {
+        const word = chunk.slice(i, i + size);
+        if (!stopWords.has(word)) counts[word] = (counts[word] || 0) + size;
       }
     }
   });
-
-  return Object.keys(scores)
-    .sort(function (a, b) {
-      return scores[b] - scores[a] || b.length - a.length;
-    })
-    .slice(0, 8);
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || b.length - a.length).slice(0, 10);
 }
 
-function selectDistinctKeywords(keywords) {
-  const selected = [];
-
-  keywords.forEach(function (keyword) {
-    const overlaps = selected.some(function (item) {
-      return item.includes(keyword) || keyword.includes(item);
-    });
-
-    if (keyword.length >= 2 && !stopWords.has(keyword) && !overlaps) {
-      selected.push(keyword);
-    }
-  });
-
-  return selected;
+function rankSentences(sentences, keywords) { return sentences.slice().sort((a, b) => scoreSentence(b, keywords) - scoreSentence(a, keywords)); }
+function scoreSentence(sentence, keywords) {
+  return keywords.reduce((sum, k) => sum + (sentence.includes(k) ? 4 : 0), 0) + (/真正|关键|不是|而是|所以|核心|问题|差距|能力|流程|工具|行动/.test(sentence) ? 12 : 0) + (sentence.length >= 18 && sentence.length <= 90 ? 4 : 0);
 }
 
-function rankSentences(sentences, keywords) {
-  return sentences.slice().sort(function (a, b) {
-    return sentenceScore(b, keywords) - sentenceScore(a, keywords);
-  });
+function makeTitle(keywords, ranked) {
+  const joined = ranked.join(" ");
+  if (/工具|流程|GitHub|Pages|AI/.test(joined)) return "普通人如何把工具变成生产流程";
+  if (/碎片|信息|行动|能力/.test(joined)) return "如何把碎片信息转化成行动能力";
+  const useful = keywords.filter((k) => !/[的了和是把在]/.test(k)).slice(0, 2).join("");
+  if (useful.length >= 4 && useful.length <= 14) return `如何提升${useful}的行动效果`.slice(0, 28);
+  return fallbackTitles[1];
 }
 
-function sentenceScore(sentence, keywords) {
-  const keywordScore = keywords.reduce(function (score, keyword) {
-    return score + (sentence.includes(keyword) ? 5 : 0);
-  }, 0);
-  const actionScore = /痛点|问题|方法|步骤|重点|记住|行动|提升|解决|学会|马上/.test(sentence) ? 4 : 0;
-  const lengthScore = sentence.length >= 14 && sentence.length <= 70 ? 3 : 0;
-
-  return keywordScore + actionScore + lengthScore;
+function makeTheme(ranked) {
+  const best = ranked.find((s) => /不是|而是|真正|核心|结论|能力|流程|行动/.test(s)) || ranked[0];
+  if (/碎片信息|操作流程|工具|行动/.test(ranked.join(" "))) return "这段内容的核心是提醒普通人不要只停留在刷信息和听概念，而要把工具真正跑通，形成自己的行动流程。";
+  return rewritePoint(best || "这段内容提醒用户把零散内容整理成可执行的方法，并通过行动验证学习效果。", 0);
 }
 
-function pickMainPoints(sentences, rankedSentences) {
-  const pointKeywords = ["首先", "第一", "第二", "第三", "其次", "然后", "最后", "重点", "原因", "方法", "记住", "核心", "问题"];
-  const explicitPoints = findByKeywords(sentences, pointKeywords);
-  return uniqueList(explicitPoints.concat(rankedSentences)).slice(0, 4);
+function makeMainPoints(sentences, ranked) {
+  const candidates = uniqueList(sentences.filter((s) => /真正|关键|不是|而是|所以|核心|问题|差距|能力|流程|工具|行动/.test(s)).concat(ranked));
+  return candidates.map(rewritePoint).filter((s) => s.length >= 16).slice(0, 5);
 }
 
-function makeTitle(keywords, coreSentences, sentences) {
-  const candidates = selectDistinctKeywords(keywords);
-  const subject = candidates.slice(0, 2).join("与") || extractReadablePhrase(coreSentences[0] || sentences[0]);
-  const benefitSentence = coreSentences.find(function (sentence) {
-    return /提升|解决|学会|做好|转化|行动|愿意|清楚/.test(sentence);
-  }) || coreSentences[0] || sentences[0];
-  const benefit = extractReadablePhrase(benefitSentence);
-
-  if (subject && benefit && !benefit.includes(subject)) {
-    return "用" + subject + "讲清" + benefit;
-  }
-
-  return "把" + (subject || "课程内容") + "拆成更容易传播的短视频文案";
+function rewritePoint(sentence) {
+  let s = sentence.replace(/^(首先|其次|然后|最后|第一|第二|第三|这里有一个关键点|所以今天最重要的结论是)[，,:：、\s]*/, "").trim();
+  if (/为什么很多人学了很多东西|最后还是没有改变/.test(s)) return "很多人学习之后没有改变，常见原因是只停留在输入信息，没有进入整理和行动。";
+  if (/收集碎片信息/.test(s)) return "很多人学习没有改变，不是因为不努力，而是因为只收集碎片信息，没有整理成系统方法。";
+  if (/操作流程/.test(s)) return "真正有效的学习不看收藏了多少内容，而看能不能把内容转化成自己的操作流程。";
+  if (/差距不是智商/.test(s)) return "普通人和会用工具的人之间，核心差距不是智商，而是愿不愿意动手跑完整流程。";
+  if (/电子杠杆/.test(s)) return "真正的电子杠杆不是知道工具名字，而是能把多个工具串成自己的生产流程。";
+  if (/不要沉迷于听概念|工具跑通/.test(s)) return "不要沉迷于听概念，要从小项目开始，把创建、修改、提交、发布和测试亲自跑通。";
+  if (!/[。！？]$/.test(s)) s += "。";
+  return s;
 }
 
-function summarizeTheme(keywords, coreSentences, sentences) {
-  const focus = keywords.slice(0, 3).join("、") || "课程表达、用户痛点、短视频转化";
-  const core = extractReadablePhrase(coreSentences[0] || sentences[0]);
-  return "围绕“" + focus + "”展开，核心是" + core + "，帮助用户把课程内容整理成更清晰、可复用、能引导行动的短视频表达。";
+function findCases(sentences) {
+  const cases = sentences.filter((s) => /比如|例如|像|你看|举个例子/.test(s)).slice(0, 3);
+  return cases.length ? cases : ["原文没有明显案例，可补充一个贴近日常操作的案例。"];
 }
 
-function extractReadablePhrase(sentence) {
-  if (!sentence) {
-    return "课程内容";
-  }
-
-  return sentence
-    .replace(/^(首先|其次|然后|最后|第一|第二|第三|第四)[，,:：、\s]*/, "")
-    .replace(/你是不是也|大家一定要|很多人/g, "")
-    .slice(0, 28);
+function findQuotes(sentences, keywords) {
+  const quotes = sentences.filter((s) => s.length >= 15 && s.length <= 80 && /不是.*而是|真正|缺的不是|谁能|差距|杠杆|关键/.test(s)).sort((a, b) => scoreSentence(b, keywords) - scoreSentence(a, keywords));
+  return uniqueList(quotes).slice(0, 4);
 }
 
-function findByKeywords(sentences, keywords) {
-  return uniqueList(sentences.filter(function (sentence) {
-    return keywords.some(function (keyword) {
-      return sentence.includes(keyword);
-    });
-  })).slice(0, 4);
+function makeActionSteps(sentences) {
+  const text = sentences.join(" ");
+  if (/工具|流程|创建|发布|测试|ChatGPT|AI|GitHub/.test(text)) return [
+    "第1步：选择一个具体的小项目，不要一开始做大而全的工具。",
+    "第2步：复制课程转写文字，先做基础清洗和结构拆解。",
+    "第3步：粘贴拆解结果到 ChatGPT，让它继续做深度总结和改写。",
+    "第4步：记录创建、修改、提交、发布、测试过程中遇到的问题。",
+    "第5步：保存跑通后的有效流程，复盘后用同一套流程处理更多课程内容。"
+  ];
+  return actionVerbs.slice(0, 5).map((verb, index) => `第${index + 1}步：${verb}一个最小任务，把内容转成可以马上执行的动作。`);
 }
 
-function findGoldenSentences(sentences, keywords) {
-  return sentences.filter(function (sentence) {
-    return sentence.length >= 12 && sentence.length <= 55 && /不是|而是|记住|关键|核心|真正|最好|一定|愿意|行动/.test(sentence);
-  }).sort(function (a, b) {
-    return sentenceScore(b, keywords) - sentenceScore(a, keywords);
-  }).slice(0, 3);
+function makeShortVideoCopy(points, steps) {
+  const point = points[0] || "很多人不是学得不够多，而是没有把知识变成行动流程。";
+  const action = steps[0].replace(/^第\d+步：/, "");
+  return `开头：很多人每天刷工具、收藏教程，但最后还是不会真正用起来。\n正文：${point}问题不在于你知道多少名字，而在于有没有亲手跑通一次。能把 AI、GitHub、Pages、转文字工具这些环节串起来，才会形成自己的生产流程。\n结尾：今天别再只收藏了，${action}你跑完一遍，就会知道差距到底在哪里。`;
 }
 
-function findSteps(sentences, rankedSentences) {
-  const stepKeywords = ["第一", "第二", "第三", "首先", "其次", "然后", "最后", "步骤", "方法", "做法", "行动"];
-  const matched = findByKeywords(sentences, stepKeywords);
-
-  if (matched.length) {
-    return matched.map(function (sentence, index) {
-      return normalizeStep(sentence, index);
-    }).slice(0, 5);
-  }
-
-  return rankedSentences.slice(0, 4).map(function (sentence, index) {
-    return "第" + (index + 1) + "步：" + extractReadablePhrase(sentence);
-  });
+function generatePrompt(showNotice) {
+  const cleanText = latestCleanText || cleanAndShow(false);
+  if (!cleanText) { if (showNotice) showMessage("请先粘贴并清洗一段视频文字。"); return; }
+  latestPromptText = `下面是一段从短视频、直播课或课程里提取出来的文字。请你不要机械复制原文，而是进行深度理解和结构化拆解。\n\n请按以下格式输出：\n\n课程标题：用一句自然、有吸引力的话概括内容；\n\n核心主题：说明这段内容真正想讲什么；\n\n主要观点：提炼 5 条核心观点，每条都要完整、通顺、像人话；\n\n关键案例：提取原文中的案例，如果原文案例不足，请指出不足；\n\n金句摘录：提取有冲击力、有启发、有传播性的原文句子；\n\n可执行步骤：把内容转化成普通人可以照着做的行动清单；\n\n短视频口播文案：改写成适合抖音/快手/视频号发布的口播稿；\n\n学习笔记版：整理成适合保存复盘的学习笔记。\n\n要求：\n\n过滤乱码、重复句、无意义词；\n\n不要保留 token、tokens、king token 等识别错误内容；\n\n不要把半截句当观点；\n\n不要把现象句当执行步骤；\n\n不要空泛，要具体；\n\n输出要适合普通人直接看懂和使用。\n\n下面是原文：${cleanText}`;
+  promptOutput.textContent = latestPromptText;
+  if (showNotice) showMessage("ChatGPT 深度拆解提示词已生成。");
 }
 
-function normalizeStep(sentence, index) {
-  if (/^第[一二三四五六七八九十]\b|^第\d+步/.test(sentence)) {
-    return sentence;
-  }
-
-  return "第" + (index + 1) + "步：" + sentence.replace(/^(首先|其次|然后|最后)[，,:：、\s]*/, "");
-}
-
-function makeShortVideoCopy(title, points, steps) {
-  const pointText = points.slice(0, 3).map(extractReadablePhrase).join("；");
-  const action = steps[0] ? steps[0].replace(/^第\d+步：/, "") : "先拆出一个最具体的用户痛点";
-
-  return "开头：如果你想做知识类短视频，先别急着把课讲完。\n" +
-    "正文：这条内容的重点是“" + title + "”。你可以按三个层次讲：" + (pointText || "先说痛点，再给方法，最后给行动") + "。\n" +
-    "结尾：今天就做一个动作——" + action + "，再把它改成一句用户一听就懂的话。";
-}
-
-function uniqueList(items) {
-  const seen = new Set();
-  return items.filter(function (item) {
-    const key = item.slice(0, 60);
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
-
-function renderResult(result) {
-  resultList.innerHTML = "";
-
-  moduleTitles.forEach(function (title, index) {
-    const item = document.createElement("article");
-    item.className = "result-item";
-
-    const itemHeader = document.createElement("div");
-    itemHeader.className = "result-item-header";
-
-    const heading = document.createElement("h3");
-    heading.innerHTML = '<span class="module-number">' + (index + 1) + "</span>" + title;
-    itemHeader.appendChild(heading);
-
-    const moduleCopyBtn = document.createElement("button");
-    moduleCopyBtn.className = "module-copy-button";
-    moduleCopyBtn.type = "button";
-    moduleCopyBtn.textContent = "复制";
-    moduleCopyBtn.addEventListener("click", function () {
-      copyText(formatModuleText(title, result[title]), "“" + title + "”已复制。");
-    });
-    itemHeader.appendChild(moduleCopyBtn);
-    item.appendChild(itemHeader);
-
-    const content = result[title];
-    if (Array.isArray(content)) {
-      const list = document.createElement("ul");
-      content.forEach(function (text) {
-        const li = document.createElement("li");
-        li.textContent = text;
-        list.appendChild(li);
-      });
-      item.appendChild(list);
-    } else {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = content;
-      item.appendChild(paragraph);
-    }
-
-    resultList.appendChild(item);
-  });
-}
-
-function formatResultText(result) {
-  return moduleTitles.map(function (title) {
-    return formatModuleText(title, result[title]);
-  }).join("\n\n");
-}
-
-function formatModuleText(title, content) {
-  const body = Array.isArray(content) ? content.map(function (item) {
-    return "- " + item;
-  }).join("\n") : content;
-
-  return "【" + title + "】\n" + body;
-}
-
-function copyText(text, successText) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(function () {
-      message.textContent = successText;
-    }).catch(function () {
-      copyTextWithTextarea(text, successText);
-    });
-    return;
-  }
-
-  copyTextWithTextarea(text, successText);
-}
-
-function copyTextWithTextarea(text, successText) {
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
-  message.textContent = successText;
-}
-
-function showEmptyResult() {
-  resultList.innerHTML = '<p class="empty">结果会显示在这里。</p>';
-}
+function renderResult(result) { resultList.innerHTML = ""; moduleTitles.forEach((title, index) => { const item = document.createElement("article"); item.className = "result-item"; const header = document.createElement("div"); header.className = "result-item-header"; const h = document.createElement("h3"); h.innerHTML = `<span class="module-number">${index + 1}</span>${title}`; const btn = document.createElement("button"); btn.className = "module-copy-button"; btn.type = "button"; btn.textContent = "复制"; btn.addEventListener("click", () => copyText(formatModuleText(title, result[title]), `“${title}”已复制。`)); header.append(h, btn); item.appendChild(header); const content = result[title]; if (Array.isArray(content)) { const ul = document.createElement("ul"); content.forEach((text) => { const li = document.createElement("li"); li.textContent = text; ul.appendChild(li); }); item.appendChild(ul); } else { const p = document.createElement("p"); p.textContent = content; item.appendChild(p); } resultList.appendChild(item); }); }
+function formatResultText(result) { return moduleTitles.map((title) => formatModuleText(title, result[title])).join("\n\n"); }
+function formatModuleText(title, content) { return `【${title}】\n${Array.isArray(content) ? content.map((item) => `- ${item}`).join("\n") : content}`; }
+function uniqueList(items) { const seen = new Set(); return items.filter((item) => { const key = item.replace(/\s+/g, "").slice(0, 80); if (seen.has(key)) return false; seen.add(key); return true; }); }
+function copyPrompt() { latestPromptText ? copyText(latestPromptText, "ChatGPT 深度拆解提示词已复制。") : showMessage("请先生成 ChatGPT 深度拆解提示词。"); }
+function showMessage(text) { message.textContent = text; }
+function showEmptyResult() { resultList.innerHTML = '<p class="empty">结果会显示在这里。</p>'; }
+function copyText(text, successText) { if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => showMessage(successText)).catch(() => copyTextWithTextarea(text, successText)); return; } copyTextWithTextarea(text, successText); }
+function copyTextWithTextarea(text, successText) { const textarea = document.createElement("textarea"); textarea.value = text; textarea.setAttribute("readonly", ""); textarea.style.position = "fixed"; textarea.style.top = "-999px"; document.body.appendChild(textarea); textarea.select(); document.execCommand("copy"); document.body.removeChild(textarea); showMessage(successText); }
