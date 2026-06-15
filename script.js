@@ -17,8 +17,8 @@ const promptOutput = document.querySelector("#promptOutput");
 const moduleTitles = ["课程标题", "核心主题", "主要观点", "关键案例", "金句摘录", "可执行步骤", "适合发短视频的文案版本"];
 const actionVerbs = ["选择", "复制", "粘贴", "清洗", "整理", "提炼", "测试", "记录", "复盘", "优化", "发布", "保存", "验证"];
 const examplePattern = /比如|例如|像|举个例子|你看/;
-const viewpointPattern = /不是.*而是|原因不是.*而是|真正|核心|问题在于|所以|关键在于|差距不是.*而是|结论|能力|流程|行动/;
-const quotePattern = /不是.*而是|缺的不是.*而是|真正的?.*不是.*而是|谁能.*谁就能|不要.*要/;
+const viewpointPattern = /不是.*而是|原因不是.*而是|真正|核心|问题在于|所以|关键在于|差距不是.*而是|工具本身不值钱，?流程才值钱|结论|能力|流程|行动/;
+const quotePattern = /缺的不是.*而是|真正的?.*不是.*而是|工具本身不值钱，?流程才值钱|谁能.*谁就能|差距不是.*而是|不是.*而是/;
 const fallbackTitles = ["普通人如何把工具变成生产流程", "如何把碎片信息转化成行动能力", "会用工具的人为什么更容易拉开差距"];
 const stopWords = new Set(["今天", "我们", "一个", "这个", "那个", "很多", "问题", "原因", "不是", "而是", "所以", "比如", "例如", "真正", "关键", "内容", "课程", "文案", "短视频", "工具", "普通人", "可以", "没有", "自己", "最后", "开始", "形成", "进行"]);
 const exampleText = `今天我们聊一个普通人非常容易忽略的问题：为什么很多人学了很多东西，最后还是没有改变？
@@ -89,7 +89,12 @@ function cleanInputText(text) {
 }
 
 function splitText(text) {
-  return uniqueList(text.split(/[。！？!?；;\n]+/).map((s) => s.trim().replace(/^[,，、：:\-\s]+|[,，、：:\-\s]+$/g, "")).filter((s) => s.length >= 12 && !isNoisySentence(s)));
+  return uniqueList(text.split(/[。！？!?\n]+/).flatMap((paragraph) => {
+    const trimmed = paragraph.trim();
+    if (!trimmed) return [];
+    if (examplePattern.test(trimmed)) return [trimmed];
+    return trimmed.split(/[；;]+/);
+  }).map((s) => s.trim().replace(/^[,，、：:\-\s]+|[,，、：:\-\s]+$/g, "")).filter((s) => s.length >= 12 && !isNoisySentence(s)));
 }
 
 function isNoisySentence(sentence) {
@@ -129,8 +134,9 @@ function getTopKeywords(text) {
 
 function rankSentences(sentences, keywords) { return sentences.slice().sort((a, b) => scoreSentence(b, keywords) - scoreSentence(a, keywords)); }
 function scoreSentence(sentence, keywords) {
-  const examplePenalty = examplePattern.test(sentence) ? -20 : 0;
-  return keywords.reduce((sum, k) => sum + (sentence.includes(k) ? 4 : 0), 0) + (viewpointPattern.test(sentence) ? 16 : 0) + (sentence.length >= 18 && sentence.length <= 90 ? 4 : 0) + examplePenalty;
+  const examplePenalty = isCaseSentence(sentence) ? -35 : 0;
+  const openingPenalty = isOpeningSentence(sentence) ? -50 : 0;
+  return keywords.reduce((sum, k) => sum + (sentence.includes(k) ? 4 : 0), 0) + (viewpointPattern.test(sentence) ? 16 : 0) + (sentence.length >= 18 && sentence.length <= 110 ? 4 : 0) + examplePenalty + openingPenalty;
 }
 
 function makeTitle(keywords, ranked) {
@@ -150,19 +156,22 @@ function makeTheme(ranked) {
 
 function makeMainPoints(sentences, ranked) {
   const viewpointSentences = sentences
-    .filter((s) => viewpointPattern.test(s) && !examplePattern.test(s))
+    .filter((s) => viewpointPattern.test(s) && !isCaseSentence(s) && !isOpeningSentence(s) && !isQuestionSentence(s))
     .sort((a, b) => scoreViewpoint(b) - scoreViewpoint(a));
-  const backupSentences = ranked.filter((s) => !examplePattern.test(s));
+  const backupSentences = ranked.filter((s) => !isCaseSentence(s) && !isOpeningSentence(s) && !isQuestionSentence(s));
   const candidates = uniqueList(viewpointSentences.concat(backupSentences));
-  return candidates.map(rewritePoint).filter((s) => s.length >= 16 && !examplePattern.test(s)).slice(0, 5);
+  return candidates.map(rewritePoint).filter((s) => s.length >= 16 && !isCaseSentence(s) && !isOpeningSentence(s) && !isQuestionSentence(s)).slice(0, 5);
 }
 
 function scoreViewpoint(sentence) {
   let score = 0;
+  if (isOpeningSentence(sentence) || isQuestionSentence(sentence)) score -= 80;
+  if (isCaseSentence(sentence)) score -= 60;
   if (/不是.*而是|原因不是.*而是|差距不是.*而是/.test(sentence)) score += 30;
+  if (/工具本身不值钱，?流程才值钱/.test(sentence)) score += 30;
   if (/真正|核心|关键在于|问题在于/.test(sentence)) score += 20;
   if (/所以|结论|能力|流程|行动/.test(sentence)) score += 10;
-  if (sentence.length >= 18 && sentence.length <= 90) score += 5;
+  if (sentence.length >= 18 && sentence.length <= 110) score += 5;
   return score;
 }
 
@@ -173,24 +182,40 @@ function rewritePoint(sentence) {
   if (/操作流程/.test(s)) return "真正有效的学习不看收藏了多少内容，而看能不能把内容转化成自己的操作流程。";
   if (/差距不是智商/.test(s)) return "普通人和会用工具的人之间，核心差距不是智商，而是愿不愿意动手跑完整流程。";
   if (/电子杠杆/.test(s)) return "真正的电子杠杆不是知道工具名字，而是能把多个工具串成自己的生产流程。";
+  if (/工具本身不值钱，?流程才值钱/.test(s)) return "工具本身不值钱，流程才值钱，真正值钱的是发现问题、调用工具、测试结果和持续优化的能力。";
   if (/不要沉迷于听概念|工具跑通/.test(s)) return "不要沉迷于听概念，要从小项目开始，把创建、修改、提交、发布和测试亲自跑通。";
   if (!/[。！？]$/.test(s)) s += "。";
   return s;
 }
 
 function findCases(sentences) {
-  const cases = sentences
-    .filter((s) => examplePattern.test(s) && !/^真正|^所以|^关键|^核心|^问题在于/.test(s))
-    .sort((a, b) => (examplePattern.test(b) ? 1 : 0) - (examplePattern.test(a) ? 1 : 0) || b.length - a.length)
+  const caseGroups = [];
+  sentences.forEach((sentence, index) => {
+    if (!examplePattern.test(sentence) || isPureViewpoint(sentence)) return;
+    let group = sentence;
+    for (let nextIndex = index + 1; nextIndex < sentences.length && nextIndex <= index + 2; nextIndex += 1) {
+      const next = sentences[nextIndex];
+      if (/^(但如果|如果|你要|你只要|然后|再|最后|这样|于是)/.test(next) || (/亲自|创建|发布|测试|操作|流程/.test(next) && group.length < 120)) {
+        group += `；${next}`;
+      } else {
+        break;
+      }
+    }
+    caseGroups.push(normalizeCase(group));
+  });
+  const cases = uniqueList(caseGroups)
+    .filter((s) => s.length >= 24 && !isPureViewpoint(s))
+    .sort((a, b) => b.length - a.length)
     .slice(0, 3);
   return cases.length ? cases : ["原文案例较少，可补充一个贴近日常操作的案例。"];
 }
 
 function findQuotes(sentences, keywords) {
   const quotes = sentences
-    .filter((s) => s.length >= 15 && s.length <= 80 && quotePattern.test(s) && !examplePattern.test(s))
+    .map(normalizeQuote)
+    .filter((s) => s.length >= 10 && s.length <= 90 && quotePattern.test(s) && !isCaseSentence(s) && !isOpeningSentence(s) && !isQuestionSentence(s))
     .sort((a, b) => scoreQuote(b, keywords) - scoreQuote(a, keywords));
-  return uniqueList(quotes.map(normalizeQuote)).slice(0, 4);
+  return uniqueList(quotes).slice(0, 5);
 }
 
 function normalizeQuote(sentence) {
@@ -201,11 +226,12 @@ function normalizeQuote(sentence) {
 
 function scoreQuote(sentence, keywords) {
   let score = keywords.reduce((sum, k) => sum + (sentence.includes(k) ? 2 : 0), 0);
-  if (/缺的不是.*而是/.test(sentence)) score += 40;
-  if (/真正的?.*不是.*而是/.test(sentence)) score += 35;
-  if (/谁能.*谁就能/.test(sentence)) score += 30;
-  if (/不要.*要/.test(sentence)) score += 25;
-  if (/不是.*而是/.test(sentence)) score += 20;
+  if (/缺的不是.*而是/.test(sentence)) score += 100;
+  if (/真正的?.*不是.*而是/.test(sentence)) score += 90;
+  if (/工具本身不值钱，?流程才值钱/.test(sentence)) score += 80;
+  if (/谁能.*谁就能/.test(sentence)) score += 70;
+  if (/差距不是.*而是/.test(sentence)) score += 60;
+  if (/不是.*而是/.test(sentence)) score += 30;
   return score;
 }
 
@@ -222,9 +248,19 @@ function makeActionSteps(sentences) {
 }
 
 function makeShortVideoCopy(points, steps) {
-  const point = points[0] || "很多人不是学得不够多，而是没有把知识变成行动流程。";
+  const point = points.find((item) => /不是.*而是|真正|流程|行动/.test(item)) || "问题不是你知道得少，而是没有亲手跑通流程。";
   const action = steps[0].replace(/^第\d+步：/, "");
-  return `开头钩子：你有没有发现，很多人天天刷教程、收藏工具，真要自己做一个东西时，还是卡在第一步。\n正文解释：${point}差距往往不是谁知道的概念更多，而是谁愿意把 AI、GitHub、Pages、转文字工具这些环节亲手串起来。你只要完整跑通一次，工具就不再是名词，而会变成你的生产流程。\n结尾引导：别再只听别人讲了，今天就${action}把流程保存下来，下次遇到新课程直接复用。`;
+  return `开头钩子：很多人每天刷 AI 工具、收藏教程，但最后还是不会真正用起来。\n正文解释：${point}真正的电子杠杆，不是记住一堆工具名，而是能把转文字、内容拆解、生成代码、网页发布这些环节串成自己的生产流程。你亲手跑通一次，工具才会从概念变成能力。\n结尾引导：今天别再只收藏了，${action}亲手跑一遍。你跑通一次，就会知道自己和只刷短视频的人差在哪里。`;
+}
+
+function isQuestionSentence(sentence) { return /[？?]/.test(sentence) || /^(为什么|你有没有发现|有没有发现|难道|是不是)/.test(sentence); }
+function isOpeningSentence(sentence) { return /^(今天(我想|我们)?(想)?讲|今天(我)?想聊|今天我们聊|你有没有发现|为什么)/.test(sentence); }
+function isCaseSentence(sentence) { return examplePattern.test(sentence) || /^(但如果|如果|你要|你看)/.test(sentence); }
+function isPureViewpoint(sentence) { return /^(真正|所以|关键|核心|问题在于|结论|原因不是|差距不是)/.test(sentence) && !examplePattern.test(sentence); }
+function normalizeCase(sentence) {
+  let s = sentence.replace(/\s+/g, " ").replace(/[;；]+/g, "；").replace(/,([\u4e00-\u9fa5])/g, "，$1").replace(/；；+/g, "；").trim();
+  if (!/[。！？]$/.test(s)) s += "。";
+  return s;
 }
 
 function generatePrompt(showNotice) {
