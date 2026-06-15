@@ -17,6 +17,8 @@ const promptOutput = document.querySelector("#promptOutput");
 const moduleTitles = ["课程标题", "核心主题", "主要观点", "关键案例", "金句摘录", "可执行步骤", "适合发短视频的文案版本"];
 const actionVerbs = ["选择", "复制", "粘贴", "清洗", "整理", "提炼", "测试", "记录", "复盘", "优化", "发布", "保存", "验证"];
 const examplePattern = /比如|例如|像|举个例子|你看/;
+const caseFollowupPattern = /^(但如果|如果|你要|你只要|这样|这就|然后|再|最后|于是)/;
+const caseActionPattern = /亲自|创建|发布|测试|操作|流程|工具|项目|网页|仓库|代码|合并|管理|优化|提取|整理|生成/;
 const viewpointPattern = /不是.*而是|原因不是.*而是|真正|核心|问题在于|所以|关键在于|差距不是.*而是|工具本身不值钱，?流程才值钱|结论|能力|流程|行动/;
 const quotePattern = /缺的不是.*而是|真正的?.*不是.*而是|工具本身不值钱，?流程才值钱|谁能.*谁就能|差距不是.*而是|不是.*而是/;
 const fallbackTitles = ["普通人如何把工具变成生产流程", "如何把碎片信息转化成行动能力", "会用工具的人为什么更容易拉开差距"];
@@ -193,9 +195,9 @@ function findCases(sentences) {
   sentences.forEach((sentence, index) => {
     if (!examplePattern.test(sentence) || isPureViewpoint(sentence)) return;
     let group = sentence;
-    for (let nextIndex = index + 1; nextIndex < sentences.length && nextIndex <= index + 2; nextIndex += 1) {
+    for (let nextIndex = index + 1; nextIndex < sentences.length && nextIndex <= index + 3; nextIndex += 1) {
       const next = sentences[nextIndex];
-      if (/^(但如果|如果|你要|你只要|然后|再|最后|这样|于是)/.test(next) || (/亲自|创建|发布|测试|操作|流程/.test(next) && group.length < 120)) {
+      if (shouldMergeCaseFollowup(next, group)) {
         group += `；${next}`;
       } else {
         break;
@@ -204,10 +206,27 @@ function findCases(sentences) {
     caseGroups.push(normalizeCase(group));
   });
   const cases = uniqueList(caseGroups)
-    .filter((s) => s.length >= 24 && !isPureViewpoint(s))
-    .sort((a, b) => b.length - a.length)
+    .filter((s) => s.length >= 24 && s.length <= 220 && !isPureViewpoint(s))
+    .sort((a, b) => scoreCase(b) - scoreCase(a))
     .slice(0, 3);
   return cases.length ? cases : ["原文案例较少，可补充一个贴近日常操作的案例。"];
+}
+
+function shouldMergeCaseFollowup(sentence, currentCase) {
+  if (!sentence || isPureViewpoint(sentence) || isOpeningSentence(sentence) || isQuestionSentence(sentence)) return false;
+  if (examplePattern.test(sentence)) return false;
+  if (currentCase.length >= 180 && !caseFollowupPattern.test(sentence)) return false;
+  return caseFollowupPattern.test(sentence) || (caseActionPattern.test(sentence) && currentCase.length < 160);
+}
+
+function scoreCase(sentence) {
+  let score = 0;
+  if (examplePattern.test(sentence)) score += 80;
+  if (/但如果|如果|你要|这样|这就/.test(sentence)) score += 30;
+  if (caseActionPattern.test(sentence)) score += 20;
+  if (sentence.length >= 80 && sentence.length <= 180) score += 20;
+  if (sentence.length > 180) score -= sentence.length - 180;
+  return score;
 }
 
 function findQuotes(sentences, keywords) {
